@@ -9,10 +9,13 @@ import android.os.Looper;
 
 public class MainActivity extends AppCompatActivity {
 
+    private boolean mUserRequestedInstall = true;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        maybeEnableArButton();
         //this.getSupportActionBar().hide();
 
         Handler handler = new Handler(Looper.getMainLooper());
@@ -26,6 +29,62 @@ public class MainActivity extends AppCompatActivity {
         };
         handler.postDelayed(r, 3000);
 
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+
+        if (!CameraPermissionHelper.hasCameraPermission(this)) {
+            CameraPermissionHelper.requestCameraPermission(this);
+            return;
+        }
+
+        try {
+            if (mSession == null) {
+                switch (ArCoreApk.getInstance().requestInstall(this, mUserRequestedInstall)) {
+                    case INSTALLED:
+                        mSession = new Session(this);
+                        break;
+                    case INSTALL_REQUESTED:
+                        mUserRequestedInstall = false;
+                        return;
+                }
+            }
+        } catch (UnavailableUserDeclinedInstallationException e) {
+            Toast.makeText(this, "TODO: handle exception "+ e, Toast.LENGTH_LONG).show();
+            return;
+        }
+    }
+
+    @Override
+    public void onRequestPermissionResult(int requestCode, String[] permissions, int[] results) {
+        super.onRequestPermissionResult(requestCode, permissions, results);
+        if (!CameraPermissionHelper.hasCameraPermissions(this)) {
+            Toast.makeText(this, "Camera permissions is needed to tun this application", Toast.LENGTH_LONG).show();
+            if (!CameraPermissionHelper.shouldShowRequestPermissionRationale(this)) {
+                CameraPermissionHelper.launchPermissionSettings(this);
+            }
+        }
+    }
+
+    void maybeEnableArButton() {
+        ArCoreApk.Availability availability = ArCoreApk.getInstance().checkAvailability(this);
+        if (availability.isTransient()) {
+            new Handler().postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    maybeEnableArButton();
+                }
+            }, 200);
+        }
+        if (availability.isSupported()) {
+            mArButton.setVisibility(View.VISIBLE);
+            mArButton.setEnabled(true);
+        } else {
+            mArButton.setVisibility(View.INVISIBLE);
+            mArButton.setEnabled(false);
+        }
     }
 }
 
