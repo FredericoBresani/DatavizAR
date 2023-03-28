@@ -8,8 +8,12 @@ import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
 import android.view.View;
+import android.widget.Button;
 import android.widget.Toast;
+
+import com.google.ar.core.ArCoreApk;
 
 import tech.tablesaw.api.Table;
 
@@ -29,6 +33,7 @@ public class CarregarDadosActivity1 extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_carregar_dados1);
+        maybeEnableArButton();
     }
 
     public void openFileChooser(View view) {
@@ -70,6 +75,26 @@ public class CarregarDadosActivity1 extends AppCompatActivity {
             // use filePath to access the selected file
 
 
+        }
+    }
+
+    void maybeEnableArButton() {
+        ArCoreApk.Availability availability = ArCoreApk.getInstance().checkAvailability(this);
+        Button mArButton = (Button) findViewById(R.id.btCarregarDados);
+        if (availability.isTransient()) {
+            new Handler().postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    maybeEnableArButton();
+                }
+            }, 200);
+        }
+        if (availability.isSupported()) {
+            mArButton.setVisibility(View.VISIBLE);
+            mArButton.setEnabled(true);
+        } else {
+            mArButton.setVisibility(View.INVISIBLE);
+            mArButton.setEnabled(false);
         }
     }
 

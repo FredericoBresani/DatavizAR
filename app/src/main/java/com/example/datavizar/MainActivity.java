@@ -14,7 +14,6 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         //this.getSupportActionBar().hide();
-
         Handler handler = new Handler(Looper.getMainLooper());
 
         final Runnable r = new Runnable() {

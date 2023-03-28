@@ -5,7 +5,9 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import android.content.Intent;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
@@ -94,8 +96,10 @@ public class CarregarDadosActivity2 extends AppCompatActivity {
         alerta.show();
     }
 
-    private void openAr() {
+    public void openAR(View btOk) {
         // todo: pegar selected items de dataSlice, passar para próxima Activity (Visualização AR)
+        Log.d("Entrooou", toString());
+        startActivity(new Intent(CarregarDadosActivity2.this, ARVisualizerActivity.class));
     }
 
 
