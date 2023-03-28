@@ -19,6 +19,8 @@
         <activity
             android:name=".CarregarDadosActivity2"
             android:exported="false" />
+        <activity android:name=".ARVisualizerActivity"
+            android:exported="false" />
         <activity
             android:name=".MainActivity"
             android:exported="true"

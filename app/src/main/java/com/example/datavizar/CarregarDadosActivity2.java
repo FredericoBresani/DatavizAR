@@ -98,7 +98,6 @@ public class CarregarDadosActivity2 extends AppCompatActivity {
 
     public void openAR(View btOk) {
         // todo: pegar selected items de dataSlice, passar para próxima Activity (Visualização AR)
-        Log.d("Entrooou", toString());
         startActivity(new Intent(CarregarDadosActivity2.this, ARVisualizerActivity.class));
     }
 

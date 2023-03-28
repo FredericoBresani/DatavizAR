@@ -12,4 +12,5 @@
     <color name="blue_grey_300">#4D606E</color>
     <color name="blue_grey_200">#627A8C</color>
     <color name="blue_grey_100">#7D93A4</color>
+    <color name="transparent">#00FFFFFF</color>
 </resources>
