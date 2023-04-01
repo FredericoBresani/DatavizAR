@@ -5,7 +5,7 @@
     tools:context="com.example.datavizar.ARVisualizerActivity"
 >
 
-<android.opengl.GLSurfaceView
+  <android.opengl.GLSurfaceView
       android:id="@+id/surfaceview"
       android:layout_width="fill_parent"
       android:layout_height="fill_parent"

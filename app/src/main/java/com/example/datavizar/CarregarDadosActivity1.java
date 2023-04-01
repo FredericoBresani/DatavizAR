@@ -9,6 +9,7 @@ import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
+import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.Toast;
@@ -55,6 +56,7 @@ public class CarregarDadosActivity1 extends AppCompatActivity {
                 ContentResolver resolver = context.getContentResolver();
 
                 try {
+                    Log.d(uri.toString()+"Entrooou", toString());
                     InputStream inputStream = resolver.openInputStream(uri);
                     BufferedReader bufReader = new BufferedReader(new InputStreamReader(inputStream));
 
