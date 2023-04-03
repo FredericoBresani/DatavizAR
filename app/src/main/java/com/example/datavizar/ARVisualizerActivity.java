@@ -6,6 +6,8 @@ import static com.google.ar.core.ArCoreApk.InstallStatus.INSTALL_REQUESTED;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.res.Resources;
+import android.opengl.GLES20;
+import android.opengl.GLES30;
 import android.opengl.GLSurfaceView;
 import android.os.Bundle;
 import android.util.Log;
@@ -28,6 +30,11 @@ import com.google.ar.core.exceptions.UnavailableDeviceNotCompatibleException;
 import com.google.ar.core.exceptions.UnavailableSdkTooOldException;
 import com.google.ar.core.exceptions.UnavailableUserDeclinedInstallationException;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.ByteBuffer;
+import java.util.HashMap;
+
 import common.helpers.CameraPermissionHelper;
 
 import common.helpers.DepthSettings;
@@ -35,7 +42,16 @@ import common.helpers.DisplayRotationHelper;
 import common.helpers.InstantPlacementSettings;
 import common.helpers.SnackbarHelper;
 import common.helpers.TapHelper;
+import common.samplerender.Framebuffer;
+import common.samplerender.GLError;
+import common.samplerender.Mesh;
 import common.samplerender.SampleRender;
+import common.samplerender.Shader;
+import common.samplerender.Texture;
+import common.samplerender.VertexBuffer;
+import common.samplerender.arcore.BackgroundRenderer;
+import common.samplerender.arcore.PlaneRenderer;
+import common.samplerender.arcore.SpecularCubemapFilter;
 
 public class ARVisualizerActivity extends AppCompatActivity implements SampleRender.Renderer {
 
@@ -164,6 +180,117 @@ public class ARVisualizerActivity extends AppCompatActivity implements SampleRen
             }
             finish();
         }
+    }
+
+    @Override
+    public void onSurfaceCreated(SampleRender render) {
+        try {
+            planeRender = new PlaneRenderer(render);
+            backgroundRenderer = new BackgroundRenderer(render);
+            virtualSceneFramebuffer = new Framebuffer(render, 1, 1);
+            cubemapFilter = new SpecularCubemapFilter(render, CUBEMAP_RESOLUTION, CUBEMAP_NUMBER_OF_IMPORTANCE_SAMPLES);
+            dfgTexture = new Texture(render, Texture.Target.TEXTURE_2D, Texture.WrapMode.CLAMP_TO_EDGE, false);
+            final int dfgResolution = 64;
+            final int dfgChannels = 2;
+            final int halfFloatSize = 2;
+
+            ByteBuffer buffer = ByteBuffer.allocateDirect(dfgResolution*dfgResolution*dfgChannels*halfFloatSize);
+
+            try (InputStream is = getAssets().open("models/dfg.raw")) {
+                is.read(buffer.array());
+            }
+
+            GLES30.glBindTexture(GLES20.GL_TEXTURE2D, dfgTexture.getTextureId());
+            GLError.maybeThrowGLException("Erro ao tentar aplicar textura dfg", "glBindTexture");
+            GLES30.glTexImage2D(
+                    GLES30.GL_TEXTURE_2D,
+                    0,
+                    GLES30.GL_RG16F,
+                    dfgResolution,
+                    dfgResolution,
+                    0,
+                    GLES30.GL_RG,
+                    GLES30.GL_HALF_FLOAT,
+                    buffer
+            );
+            GLError.maybeThrowGLException("Falha ao popular textura dfg", "glTexImage2d");
+            pointCloudShader = Shader.createFromAssets(
+                    render,
+                    "shaders/point_cloud.vert",
+                    "shaders/point_cloud.frag",
+                    null).setVec4(
+                            "u_Color",
+                        new float[] {31.0f / 255.0f, 188.0f / 255.0f, 210.0f / 255.0f, 1.0f}
+                    ).setFloat("u_PointSize", 5.0f);
+            pointCloudVertexBuffer = new VertexBuffer(render, 4, null);
+            final VertexBuffer[] pointCloudVertexBuffers = {pointCloudVertexBuffer};
+            pointCloudMesh = new Mesh(render, Mesh.PrimitiveMode.POINTS, null, pointCloudVertexBuffers);
+            virtualObjectAlbedoTexture = Texture.createFromAsset(
+                    render,
+                    "models/pawn_albedo.png",
+                    Texture.WrapMode.CLAMP_TO_EDGE,
+                    Texture.ColorFormat.SRGB
+            );
+            virtualObjectAlbedoInstantPlacementTexture = Texture.createFromAsset(
+                    render,
+                    "models/pawn_albedo_instant_placement.png",
+                    Texture.WrapMode.CLAMP_TO_EDGE,
+                    Texture.ColorFormat.SRGB
+            );
+            Texture virtualObjectPbrTexture = Texture.createFromAsset(
+                    render,
+                    "models/pawn_roughness_metallic_ao.png",
+                    Texture.WrapMode.CLAMP_TO_EDGE,
+                    Texture.ColorFormat.LINEAR
+            );
+            virtualObjectMesh = Mesh.createFromAsset(render, "models/pawn.obj");
+            virtualObjectShader = Shader.createFromAssets(
+                    render,
+                    "shaders/environmental_hdr.vert",
+                    "shaders/environmental_hdr.frag",
+                    new HashMap<String, String>() {
+                        {
+                            put("NUMBER_OF_MIPMAP_LEVELS", Integer.toString(cubemapFilter.getNumberOfMipmapLevels()));
+                        }
+                    }
+            )
+            .setTexture("u_AlbedoTexture", virtualObjectAlbedoTexture)
+            .setTexture("u_RoughnessMetallicAmbientOcclusionTexture", virtualObjectPbrTexture)
+            .setTexture("u_Cubemap", cubemapFilter.getFilteredCubemapTexture())
+            .setTexture("u_DfgTexture", dfgTexture);
+        } catch (IOException e) {
+            Log.e(TAG, "Não conseguiu ler um asset", e);
+            messageSnackbarHelper.showError(this, "Não conseguiu ler um asset" + e);
+        }
+    }
+
+    @Override
+    public void onSurfaceChanged(SampleRender render, int width, int height) {
+        displayRotationHelper.onSurfaceChanged(width, height);
+        virtualSceneFramebuffer.resize(width, height);
+    }
+
+    @Override
+    public void onDrawFrame(SampleRender render) {
+        if (mSession == null) {
+            return;
+        }
+
+        if(!hasSetTextureNames) {
+            mSession.setCameraTextureNames(new int[] {backgroundRenderer.getCameraColorTexture().getTextureId()});
+            hasSetTextureNames = true;
+        }
+
+        displayRotationHelper.updateSessionIfNeeded(mSession);
+        Frame frame;
+        try {
+            frame = mSession.update();
+        } catch (CameraNotAvailableException e) {
+            Log.e(TAG, "Camera não disponível em drawFrame", e);
+            messageSnackbarHelper.showError(this, "Camera não disponível, reinicie o aplicativo");
+            return;
+        }
+        Camera camera = frame.getCamera();
     }
 
     private void configureSession() {
